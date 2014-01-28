@@ -76,7 +76,7 @@ void doMaster() {
 		if(i==1) {
 			sleep(1); // sleep for 1 second
 			int curSpeed = getSpeedInfo(attempts);
-			cout << "\rAttempts per second: " << curSpeed;
+			cout << "\rAttempts per second: " << curSpeed << " attemps/sec          " << flush;
 		}
 	}
 	
