@@ -52,7 +52,8 @@ void doMaster() {
 	cin >> size;
 	size = min(1024, max(0, size)); // size between 0 and 1024
 	vector<int> nums(size, 0);
-	vector<long long> attempts(size, 0);
+	vector<long long> attempts(procCnt, 0);
+	vector<MPI::Request> nodesAnswers(procCnt);
 	cout << "Type " << size << " numbers: ";
 	for(int i=0; i<size; i++)
 		cin >> nums[i];
@@ -66,10 +67,14 @@ void doMaster() {
 	
 	const int nameMaxLen = 32;
 	char solvedBy[nameMaxLen] = { 0 };
+	MPI::Request req = MPI::COMM_WORLD.Irecv(&nums[0], size, MPI::INT, 1, DATA_TAG);
+	for(int i=1; i<procCnt; i++)
+		nodesAnswers[i] = MPI::COMM_WORLD.Irecv(&nums[0], size, MPI::INT, i, DATA_TAG);
 	for(int i=1; ; i = i+1<procCnt ? i+1 : 1) {
-		MPI::Request req = MPI::COMM_WORLD.Irecv(&nums[0], size, MPI::INT, i, DATA_TAG);
-		if(req.Get_status()) {
-			MPI::COMM_WORLD.Recv(solvedBy, nameMaxLen, MPI::CHAR, i, COMM_TAG);
+		//MPI::Request req = MPI::COMM_WORLD.Irecv(&nums[0], size, MPI::INT, i, DATA_TAG);
+		//if(req.Get_status()) {
+		if(nodesAnswers[i].Get_status()) {
+		MPI::COMM_WORLD.Recv(solvedBy, nameMaxLen, MPI::CHAR, i, COMM_TAG);
 			totalTime = difftime(time(NULL), startTime);
 			break;
 		}
@@ -88,7 +93,7 @@ void doMaster() {
 	
 	for(int i=1; i<procCnt; i++) {
 		cout << "Shutting node " << i << " down...\n";
-		MPI::COMM_WORLD.Send(DONE_MSG, strlen(DONE_MSG)+1, MPI::CHAR, i, COMM_TAG);
+		MPI::COMM_WORLD.Isend(DONE_MSG, strlen(DONE_MSG)+1, MPI::CHAR, i, COMM_TAG); // FIXME perform error checking!
 	}
 	
 	sleep(1); // wait for info
@@ -147,10 +152,19 @@ void doSlave() {
 		char procName[msgMaxLen] = { 0 };
 		int procNameLen = 0;
 		MPI::Get_processor_name(procName, procNameLen);
-		MPI::COMM_WORLD.Send(&nums[0], size, MPI::INT, masterNode, DATA_TAG);
-		MPI::COMM_WORLD.Send(procName, procNameLen, MPI::CHAR, masterNode, COMM_TAG);
+		/*req =*/ MPI::COMM_WORLD.Send(&nums[0], size, MPI::INT, masterNode, DATA_TAG);
+		//if(req.Get_status() == false) {
+		//	cerr << "[" << procName << "] cannot send sorted numbers!\n" << flush;
+		//	continue;
+		//}
+		/*req =*/ MPI::COMM_WORLD.Send(procName, procNameLen, MPI::CHAR, masterNode, COMM_TAG);
+		//if(req.Get_status() == false) {
+		//	cerr << "[" << procName << "] cannot send processor name!\n" << flush;
+		//	continue;
+		//}
+		cout << "Node " << MPI::COMM_WORLD.Get_rank() << " finished!\n" << flush;
 		break;
 	}
-	//cout << "Node " << MPI::COMM_WORLD.Get_rank() << " exiting...";
-	MPI::COMM_WORLD.Send(&attempts, 1, MPI::INT, masterNode, SPEED_TAG);
+	cout << "Node " << MPI::COMM_WORLD.Get_rank() << " exiting...\n" << flush;
+	MPI::COMM_WORLD.Isend(&attempts, 1, MPI::INT, masterNode, SPEED_TAG); // FIXME perform error checking!
 }
