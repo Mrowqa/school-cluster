@@ -31,10 +31,11 @@ int main(int argc, char* argv[]) {
 
 
 int getSpeedInfo(vector<long long>& attempts) {
-	int curSpeed = 0;
+	static int curNumber = 0; // MPI Irecv can update this variable out of this function call
+	int curSpeed = curNumber;
+	curNumber = 0;
 	int procCnt = MPI::COMM_WORLD.Get_size();
 	for(int j=1; j<procCnt; j++) {
-		int curNumber = 0;
 		while(MPI::COMM_WORLD.Irecv(&curNumber, 1, MPI::INT, j, SPEED_TAG).Get_status()) {
 			attempts[j] += curNumber;
 			curSpeed += curNumber;
@@ -125,10 +126,11 @@ void doSlave() {
 	time_t lastUpdate = time(NULL);
 	int attempts = 0;
 	
+	const int msgMaxLen = 32;
+	char msg[msgMaxLen];
+	MPI::Request req = MPI::COMM_WORLD.Irecv(msg, msgMaxLen, MPI::CHAR, masterNode, COMM_TAG);
+	
 	while(true) {
-		const int msgMaxLen = 32;
-		char msg[msgMaxLen];
-		MPI::Request req = MPI::COMM_WORLD.Irecv(msg, msgMaxLen, MPI::CHAR, masterNode, COMM_TAG);
 		if(req.Get_status() && strcmp(msg, DONE_MSG) == 0)
 			break;
 		
@@ -152,12 +154,12 @@ void doSlave() {
 		char procName[msgMaxLen] = { 0 };
 		int procNameLen = 0;
 		MPI::Get_processor_name(procName, procNameLen);
-		/*req =*/ MPI::COMM_WORLD.Send(&nums[0], size, MPI::INT, masterNode, DATA_TAG);
+		/*req =*/ MPI::COMM_WORLD.Isend(&nums[0], size, MPI::INT, masterNode, DATA_TAG);
 		//if(req.Get_status() == false) {
 		//	cerr << "[" << procName << "] cannot send sorted numbers!\n" << flush;
 		//	continue;
 		//}
-		/*req =*/ MPI::COMM_WORLD.Send(procName, procNameLen, MPI::CHAR, masterNode, COMM_TAG);
+		/*req =*/ MPI::COMM_WORLD.Isend(procName, procNameLen, MPI::CHAR, masterNode, COMM_TAG);
 		//if(req.Get_status() == false) {
 		//	cerr << "[" << procName << "] cannot send processor name!\n" << flush;
 		//	continue;
