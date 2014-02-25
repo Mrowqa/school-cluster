@@ -3,6 +3,7 @@
 #include <mpi.h>
 #include <ctime>
 #include <cstdlib>
+#include <string>
 using namespace std;
 
 void doMaster();
@@ -44,6 +45,15 @@ int getSpeedInfo(vector<long long>& attempts) {
 	return curSpeed;
 }
 
+string formatTime(time_t time) {
+	char buffer[32]="00:00:00";
+	int seconds = time % 60;
+	int minutes = time / 60 % 60;
+	int hours = time / 3600;
+	sprintf(buffer, "%02i:%02i:%02i", hours, minutes, seconds);
+	return buffer;
+}
+
 void doMaster() {
 	int procCnt = MPI::COMM_WORLD.Get_size();
 	cout << "Available " << procCnt << " processors\n";
@@ -68,7 +78,7 @@ void doMaster() {
 	
 	const int nameMaxLen = 32;
 	char solvedBy[nameMaxLen] = { 0 };
-	MPI::Request req = MPI::COMM_WORLD.Irecv(&nums[0], size, MPI::INT, 1, DATA_TAG);
+	//MPI::Request req = MPI::COMM_WORLD.Irecv(&nums[0], size, MPI::INT, 1, DATA_TAG);
 	for(int i=1; i<procCnt; i++)
 		nodesAnswers[i] = MPI::COMM_WORLD.Irecv(&nums[0], size, MPI::INT, i, DATA_TAG);
 	for(int i=1; ; i = i+1<procCnt ? i+1 : 1) {
@@ -82,7 +92,8 @@ void doMaster() {
 		if(i==1) {
 			sleep(1); // sleep for 1 second
 			int curSpeed = getSpeedInfo(attempts);
-			cout << "\rAttempts per second: " << curSpeed << " attemps/sec          " << flush;
+			cout << "\rAttempts per second: " << curSpeed << " attemps/sec\t\t"
+				"Total time: " << formatTime(difftime(time(NULL), startTime)) << flush;
 		}
 	}
 	
@@ -105,6 +116,7 @@ void doMaster() {
 	
 	cout << "Total attempts: " << totalAttemptsCnt << endl;
 	cout << "Average speed: " << (static_cast<double>(totalAttemptsCnt)/totalTime) << " attemps/sec\n";
+	cout << "Total time: " << formatTime(difftime(time(NULL), startTime)) << "\n\n";
 	
 	cout << "Exiting master function.\n";
 }
